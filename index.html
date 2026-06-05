@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>don8n CRM</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root {
+  --bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--bg4:#252d3f;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#e8eaf0;--text2:#8b93a8;--text3:#5a6278;
+  --accent:#4f7cff;--accent2:#6b93ff;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;
+  --purple:#a78bfa;--teal:#14b8a6;
+  --r:10px;--rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--rs);padding:8px 12px;font-size:13px;width:100%;outline:none;transition:border .2s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+button{cursor:pointer;border:none;font-size:13px;font-family:inherit;transition:all .15s}
+.btn{padding:8px 16px;border-radius:var(--rs);font-weight:500}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:var(--accent2)}
+.btn-g{background:transparent;color:var(--text2);border:1px solid var(--border2)}.btn-g:hover{background:var(--bg3);color:var(--text)}
+.btn-d{background:var(--red);color:#fff}.btn-d:hover{opacity:.85}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.tg{background:rgba(34,197,94,.15);color:var(--green)}
+.ta{background:rgba(245,158,11,.15);color:var(--amber)}
+.tr{background:rgba(239,68,68,.15);color:var(--red)}
+.tb{background:rgba(79,124,255,.15);color:var(--accent2)}
+.tp{background:rgba(167,139,250,.15);color:var(--purple)}
+.tt{background:rgba(20,184,166,.15);color:var(--teal)}
+.tz{background:var(--bg3);color:var(--text2)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.fg label{font-size:12px;color:var(--text2);font-weight:500}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback} = React;
+
+const SK = 'don8n_v1';
+const DEF = {
+  config:{n8nUrl:'',n8nApiKey:'',workflowId:'',evolutionUrl:'',evolutionKey:'',instance:''},
+  contacts:[
+    {id:1,name:'Maria Souza',phone:'5537991112222',status:'lead',tags:['cliente'],lastMsg:'2025-06-04T10:30:00',notes:'Interessada em ração premium',city:'Divinópolis'},
+    {id:2,name:'Carlos Mendes',phone:'5537988887777',status:'ativo',tags:['vip'],lastMsg:'2025-06-04T14:15:00',notes:'Cliente fiel, compra mensalmente',city:'Itaúna'},
+    {id:3,name:'Ana Paula',phone:'5531977776666',status:'negociando',tags:['atacado'],lastMsg:'2025-06-03T09:00:00',notes:'Pedindo desconto para lote grande',city:'BH'},
+    {id:4,name:'Roberto Lima',phone:'5537999001111',status:'inativo',tags:[],lastMsg:'2025-05-20T16:45:00',notes:'',city:'Divinópolis'},
+  ],
+  conversations:[
+    {id:1,contactId:1,from:'contact',text:'Boa tarde! Vocês têm ração para cachorro de porte grande?',ts:'2025-06-04T10:28:00'},
+    {id:2,contactId:1,from:'bot',text:'Olá Maria! Sim, temos várias opções. Qual marca você prefere?',ts:'2025-06-04T10:29:00'},
+    {id:3,contactId:1,from:'contact',text:'Royal Canin se tiver',ts:'2025-06-04T10:30:00'},
+    {id:4,contactId:2,from:'contact',text:'Oi, quero fazer um pedido de ração Golden 15kg',ts:'2025-06-04T14:14:00'},
+    {id:5,contactId:2,from:'bot',text:'Perfeito Carlos! Temos em estoque. R$ 180,00. Vou registrar!',ts:'2025-06-04T14:15:00'},
+  ],
+  kanban:{
+    columns:['Novo Lead','Em Contato','Proposta Enviada','Fechado','Perdido'],
+    cards:[
+      {id:1,contactId:1,column:'Em Contato',title:'Ração Royal Canin GG',value:320,notes:''},
+      {id:2,contactId:3,column:'Proposta Enviada',title:'Pedido atacado ração',value:2800,notes:'Aguardando retorno'},
+      {id:3,contactId:4,column:'Novo Lead',title:'Interesse vermicida',value:0,notes:''},
+    ]
+  },
+  agent:{status:'active',totalMessages:1247,handoffs:23,responseRate:94}
+};
+
+function loadD(){try{const r=localStorage.getItem(SK);if(r){const p=JSON.parse(r);return{...DEF,...p,config:{...DEF.config,...(p.config||{})}}}}catch(e){}return DEF}
+function saveD(d){try{localStorage.setItem(SK,JSON.stringify(d))}catch(e){}}
+
+// ICONS
+const IC = ({n,s=16,st})=>(
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={st}>
+    {n==='users'&&<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>}
+    {n==='msg'&&<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}
+    {n==='kb'&&<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v12"/></>}
+    {n==='chart'&&<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>}
+    {n==='bot'&&<><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></>}
+    {n==='cog'&&<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}
+    {n==='plus'&&<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}
+    {n==='x'&&<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>}
+    {n==='ph'&&<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.18 2 2 0 0 1 3.58 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>}
+    {n==='ed'&&<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>}
+    {n==='tr'&&<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></>}
+    {n==='wa'&&<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>}
+    {n==='pl'&&<polygon points="5 3 19 12 5 21 5 3"/>}
+    {n==='pa'&&<><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></>}
+    {n==='ok'&&<polyline points="20 6 9 17 4 12"/>}
+    {n==='rf'&&<><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></>}
+    {n==='sr'&&<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>}
+    {n==='sn'&&<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>}
+    {n==='mp'&&<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>}
+  </svg>
+);
+
+const fmtP=p=>p?p.replace(/^55/,'').replace(/^(\d{2})(\d{5})(\d{4})$/,'($1) $2-$3'):'';
+const fmtD=ts=>{
+  if(!ts)return'';
+  const d=new Date(ts),now=new Date(),diff=(now-d)/1000;
+  if(diff<60)return'agora';if(diff<3600)return`${Math.floor(diff/60)}min`;
+  if(diff<86400)return`${Math.floor(diff/3600)}h`;
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+};
+const SM={lead:{l:'Lead',c:'tb'},ativo:{l:'Ativo',c:'tg'},negociando:{l:'Negociando',c:'ta'},inativo:{l:'Inativo',c:'tz'}};
+const av=(name)=>{const c=name.charAt(0).toUpperCase();const colors=['#4f7cff','#22c55e','#f59e0b','#a78bfa','#14b8a6','#ef4444'];const i=name.charCodeAt(0)%colors.length;return{c,bg:colors[i]};};
+
+// SIDEBAR
+function Sidebar({active,setActive}){
+  const nav=[
+    {id:'contacts',ic:'users',label:'Contatos'},
+    {id:'inbox',ic:'msg',label:'Conversas'},
+    {id:'kanban',ic:'kb',label:'Kanban'},
+    {id:'metrics',ic:'chart',label:'Métricas'},
+    {id:'agent',ic:'bot',label:'Agente'},
+    {id:'settings',ic:'cog',label:'Configurações'},
+  ];
+  return(
+    <div style={{width:220,background:'var(--bg2)',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',height:'100vh',position:'fixed',left:0,top:0,zIndex:10,flexShrink:0}}>
+      <div style={{padding:'18px 16px',borderBottom:'1px solid var(--border)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#4f7cff,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <IC n="wa" s={18} st={{color:'#fff'}}/>
+          </div>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,color:'var(--text)',letterSpacing:'-0.3px'}}>don8n</div>
+            <div style={{fontSize:11,color:'var(--text3)'}}>CRM WhatsApp</div>
+          </div>
+        </div>
+      </div>
+      <nav style={{flex:1,padding:'10px 8px'}}>
+        {nav.map(item=>(
+          <button key={item.id} onClick={()=>setActive(item.id)}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:8,background:active===item.id?'var(--bg3)':'transparent',color:active===item.id?'var(--text)':'var(--text2)',border:'none',cursor:'pointer',textAlign:'left',marginBottom:2,transition:'all .15s',fontWeight:active===item.id?500:400}}>
+            <IC n={item.ic} s={17}/>{item.label}
+          </button>
+        ))}
+      </nav>
+      <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)',fontSize:11,color:'var(--text3)'}}>don8n CRM v1.0</div>
+    </div>
+  );
+}
+
+// AVATAR
+function Av({name,size=36}){
+  const {c,bg}=av(name);
+  return <div style={{width:size,height:size,borderRadius:'50%',background:bg+'22',border:`1px solid ${bg}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*0.38,fontWeight:700,color:bg,flexShrink:0}}>{c}</div>;
+}
+
+// CONTACTS PAGE
+function ContactsPage({data,setData,setActiveContact,setPage}){
+  const [search,setSearch]=useState('');
+  const [fs,setFs]=useState('all');
+  const [show,setShow]=useState(false);
+  const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({name:'',phone:'',status:'lead',city:'',notes:'',tags:''});
+
+  const list=data.contacts.filter(c=>{
+    const q=search.toLowerCase();
+    return(!q||c.name.toLowerCase().includes(q)||c.phone.includes(q))&&(fs==='all'||c.status===fs);
+  });
+
+  const openNew=()=>{setEdit(null);setForm({name:'',phone:'',status:'lead',city:'',notes:'',tags:''});setShow(true)};
+  const openEdit=c=>{setEdit(c);setForm({name:c.name,phone:c.phone,status:c.status,city:c.city||'',notes:c.notes||'',tags:(c.tags||[]).join(', ')});setShow(true)};
+
+  const save=()=>{
+    const tags=form.tags?form.tags.split(',').map(t=>t.trim()).filter(Boolean):[];
+    const up={...form,tags,phone:form.phone.replace(/\D/g,'')};
+    if(edit){setData(d=>({...d,contacts:d.contacts.map(c=>c.id===edit.id?{...c,...up}:c)}))}
+    else{const nid=Math.max(0,...data.contacts.map(c=>c.id))+1;setData(d=>({...d,contacts:[...d.contacts,{id:nid,lastMsg:new Date().toISOString(),...up}]}))}
+    setShow(false);
+  };
+
+  const del=id=>{if(confirm('Remover este contato?'))setData(d=>({...d,contacts:d.contacts.filter(c=>c.id!==id)}))};
+
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:600,color:'var(--text)'}}>Contatos</h1>
+          <p style={{color:'var(--text2)',fontSize:13}}>{data.contacts.length} contatos no total</p>
+        </div>
+        <button className="btn btn-p" onClick={openNew} style={{display:'flex',alignItems:'center',gap:6}}>
+          <IC n="plus" s={15}/> Novo contato
+        </button>
+      </div>
+      <div style={{display:'flex',gap:10,marginBottom:16}}>
+        <div style={{flex:1,position:'relative'}}>
+          <IC n="sr" s={15} st={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)'}}/>
+          <input placeholder="Buscar por nome ou telefone..." value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:32}}/>
+        </div>
+        <select value={fs} onChange={e=>setFs(e.target.value)} style={{width:150}}>
+          <option value="all">Todos</option><option value="lead">Lead</option>
+          <option value="ativo">Ativo</option><option value="negociando">Negociando</option><option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div style={{background:'var(--bg2)',borderRadius:'var(--r)',border:'1px solid var(--border)',overflow:'hidden'}}>
+        {list.length===0?<div style={{padding:40,textAlign:'center',color:'var(--text3)'}}>Nenhum contato encontrado</div>:
+        list.map((c,i)=>(
+          <div key={c.id} style={{display:'flex',alignItems:'center',padding:'12px 16px',borderBottom:i<list.length-1?'1px solid var(--border)':'none',gap:14}}>
+            <Av name={c.name}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:500,color:'var(--text)',marginBottom:2}}>{c.name}</div>
+              <div style={{display:'flex',alignItems:'center',gap:8,color:'var(--text2)',fontSize:12}}>
+                <IC n="ph" s={12}/>{fmtP(c.phone)}
+                {c.city&&<><span style={{color:'var(--border2)'}}>•</span><IC n="mp" s={12}/>{c.city}</>}
+              </div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+              {(c.tags||[]).map(t=><span key={t} className="tag tp">{t}</span>)}
+              <span className={`tag ${SM[c.status]?.c}`}>{SM[c.status]?.l}</span>
+              <span style={{fontSize:11,color:'var(--text3)',minWidth:40,textAlign:'right'}}>{fmtD(c.lastMsg)}</span>
+            </div>
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              <button onClick={()=>{setActiveContact(c);setPage('inbox')}} className="btn btn-g" style={{padding:'6px 8px'}} title="Ver conversa"><IC n="msg" s={15}/></button>
+              <button onClick={()=>openEdit(c)} className="btn btn-g" style={{padding:'6px 8px'}}><IC n="ed" s={15}/></button>
+              <button onClick={()=>del(c.id)} className="btn btn-g" style={{padding:'6px 8px',color:'var(--red)'}}><IC n="tr" s={15}/></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {show&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShow(false)}>
+          <div className="modal">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <h2 style={{fontSize:16,fontWeight:600}}>{edit?'Editar contato':'Novo contato'}</h2>
+              <button onClick={()=>setShow(false)} style={{background:'none',color:'var(--text2)',padding:4}}><IC n="x" s={18}/></button>
+            </div>
+            <div className="fr">
+              <div className="fg"><label>Nome *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Nome completo"/></div>
+              <div className="fg"><label>Telefone (WhatsApp)</label><input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="5537999001111"/></div>
+            </div>
+            <div className="fr">
+              <div className="fg"><label>Status</label>
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+                  <option value="lead">Lead</option><option value="ativo">Ativo</option><option value="negociando">Negociando</option><option value="inativo">Inativo</option>
+                </select>
+              </div>
+              <div className="fg"><label>Cidade</label><input value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} placeholder="Divinópolis"/></div>
+            </div>
+            <div className="fg"><label>Tags (vírgula)</label><input value={form.tags} onChange={e=>setForm(f=>({...f,tags:e.target.value}))} placeholder="vip, atacado"/></div>
+            <div className="fg"><label>Observações</label><textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={3} placeholder="Notas..."/></div>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:8}}>
+              <button className="btn btn-g" onClick={()=>setShow(false)}>Cancelar</button>
+              <button className="btn btn-p" onClick={save} disabled={!form.name||!form.phone}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// INBOX PAGE
+function InboxPage({data,setData,activeContact,setActiveContact}){
+  const [newMsg,setNewMsg]=useState('');
+  const [correcting,setCorrecting]=useState(null);
+  const [correction,setCorrection]=useState('');
+  const [corrSaved,setCorrSaved]=useState(false);
+  const endRef=useRef(null);
+
+  const cList=data.contacts.map(c=>({
+    ...c,msgs:data.conversations.filter(m=>m.contactId===c.id)
+  })).sort((a,b)=>new Date(b.lastMsg)-new Date(a.lastMsg));
+
+  const curMsgs=activeContact?data.conversations.filter(m=>m.contactId===activeContact.id):[];
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'})},[activeContact,curMsgs.length]);
+
+  const send=()=>{
+    if(!newMsg.trim()||!activeContact)return;
+    const m={id:Date.now(),contactId:activeContact.id,from:'operator',text:newMsg.trim(),ts:new Date().toISOString()};
+    setData(d=>({...d,conversations:[...d.conversations,m]}));
+    setNewMsg('');
+  };
+
+  const openCorrection=(msg)=>{
+    setCorrecting(msg);
+    setCorrection(msg.text);
+  };
+
+  const saveCorrection=()=>{
+    if(!correction.trim())return;
+    const learn={id:Date.now(),original:correcting.text,corrected:correction.trim(),ts:new Date().toISOString(),contactId:correcting.contactId};
+    setData(d=>({...d,learnings:[...(d.learnings||[]),learn]}));
+    setData(d=>({...d,conversations:d.conversations.map(m=>m.id===correcting.id?{...m,text:correction.trim(),corrected:true}:m)}));
+    setCorrecting(null);setCorrection('');
+    setCorrSaved(true);setTimeout(()=>setCorrSaved(false),2500);
+  };
+
+  const Bubble=({msg})=>{
+    const isMe=msg.from==='operator';
+    const isBot=msg.from==='bot';
+    const [hover,setHover]=useState(false);
+    return(
+      <div style={{display:'flex',justifyContent:isMe?'flex-end':'flex-start',marginBottom:8}}
+        onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
+        <div style={{maxWidth:'72%',position:'relative'}}>
+          {isBot&&(
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2,paddingLeft:4}}>
+              <span style={{fontSize:10,color:'var(--text3)'}}>🤖 Tião</span>
+              {msg.corrected&&<span style={{fontSize:10,background:'rgba(245,158,11,.15)',color:'var(--amber)',padding:'1px 6px',borderRadius:10}}>✏ corrigido</span>}
+            </div>
+          )}
+          <div style={{background:isMe?'var(--accent)':isBot?'var(--bg4)':'var(--bg3)',color:isMe?'#fff':'var(--text)',padding:'8px 12px',borderRadius:isMe?'14px 14px 4px 14px':'14px 14px 14px 4px',fontSize:13,lineHeight:1.5,border:msg.corrected?'1px solid rgba(245,158,11,.3)':'none'}}>
+            {msg.text}
+          </div>
+          {isBot&&hover&&(
+            <button onClick={()=>openCorrection(msg)}
+              style={{position:'absolute',bottom:-20,left:4,background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--amber)',borderRadius:6,padding:'2px 8px',fontSize:11,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap',zIndex:5}}>
+              <IC n="ed" s={12}/> Corrigir Tião
+            </button>
+          )}
+          <div style={{fontSize:10,color:'var(--text3)',marginTop:msg.from==='bot'?22:2,textAlign:isMe?'right':'left'}}>{fmtD(msg.ts)}</div>
+        </div>
+      </div>
+    );
+  };
+
+  return(
+    <div style={{display:'flex',height:'calc(100vh - 60px)',gap:0,position:'relative'}}>
+      {corrSaved&&(
+        <div style={{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',background:'var(--bg3)',border:'1px solid rgba(245,158,11,.4)',color:'var(--amber)',padding:'8px 16px',borderRadius:8,fontSize:13,zIndex:20,display:'flex',alignItems:'center',gap:6}}>
+          <IC n="ok" s={14}/> Correção salva! Tião vai aprender.
+        </div>
+      )}
+      {correcting&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setCorrecting(null)}>
+          <div className="modal">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <h2 style={{fontSize:16,fontWeight:600}}>Corrigir resposta do Tião</h2>
+              <button onClick={()=>setCorrecting(null)} style={{background:'none',color:'var(--text2)',padding:4}}><IC n="x" s={18}/></button>
+            </div>
+            <div className="fg">
+              <label>Resposta original</label>
+              <div style={{background:'var(--bg4)',border:'1px solid var(--border)',borderRadius:'var(--rs)',padding:'8px 12px',fontSize:13,color:'var(--text2)',lineHeight:1.5}}>{correcting.text}</div>
+            </div>
+            <div className="fg">
+              <label>Como deveria ter respondido?</label>
+              <textarea value={correction} onChange={e=>setCorrection(e.target.value)} rows={4} placeholder="Digite a resposta correta..." style={{lineHeight:1.5}}/>
+            </div>
+            <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--amber)',lineHeight:1.6}}>
+              💡 A correção será salva em Aprendizados na aba Agente. Copie e cole no prompt do Tião no n8n.
+            </div>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button className="btn btn-g" onClick={()=>setCorrecting(null)}>Cancelar</button>
+              <button className="btn" onClick={saveCorrection} disabled={!correction.trim()} style={{background:'var(--amber)',color:'#fff',borderRadius:'var(--rs)',fontWeight:500,padding:'8px 16px'}}>Salvar correção</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div style={{width:260,background:'var(--bg2)',borderRadius:'var(--r) 0 0 var(--r)',border:'1px solid var(--border)',borderRight:'none',overflow:'hidden',display:'flex',flexDirection:'column',flexShrink:0}}>
+        <div style={{padding:'12px',borderBottom:'1px solid var(--border)'}}>
+          <h2 style={{fontSize:14,fontWeight:600,marginBottom:8}}>Conversas</h2>
+          <input placeholder="Buscar..." style={{fontSize:12}}/>
+        </div>
+        <div style={{flex:1,overflowY:'auto'}}>
+          {cList.map(c=>(
+            <div key={c.id} onClick={()=>setActiveContact(c)}
+              style={{padding:'10px 12px',cursor:'pointer',background:activeContact?.id===c.id?'var(--bg3)':'transparent',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10,transition:'background .1s'}}>
+              <Av name={c.name} size={34}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:500,fontSize:13,color:'var(--text)',marginBottom:1}}>{c.name}</div>
+                <div style={{fontSize:11,color:'var(--text3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {c.msgs.length>0?c.msgs[c.msgs.length-1].text:'Sem mensagens'}
+                </div>
+              </div>
+              <div style={{fontSize:10,color:'var(--text3)',flexShrink:0}}>{fmtD(c.lastMsg)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{flex:1,background:'var(--bg2)',borderRadius:'0 var(--r) var(--r) 0',border:'1px solid var(--border)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        {!activeContact?(
+          <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--text3)'}}>
+            <IC n="msg" s={40} st={{marginBottom:12,opacity:.3}}/><p>Selecione uma conversa</p>
+          </div>
+        ):(
+          <>
+            <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12}}>
+              <Av name={activeContact.name} size={36}/>
+              <div>
+                <div style={{fontWeight:500,color:'var(--text)'}}>{activeContact.name}</div>
+                <div style={{fontSize:12,color:'var(--text3)'}}>{fmtP(activeContact.phone)}</div>
+              </div>
+              <div style={{marginLeft:'auto'}}><span className={`tag ${SM[activeContact.status]?.c}`}>{SM[activeContact.status]?.l}</span></div>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:16}}>
+              {curMsgs.length===0?<div style={{textAlign:'center',color:'var(--text3)',marginTop:40}}>Nenhuma mensagem ainda</div>:curMsgs.map(m=><Bubble key={m.id} msg={m}/>)}
+              <div ref={endRef}/>
+            </div>
+            <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)',display:'flex',gap:8}}>
+              <input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Mensagem como operador..."/>
+              <button className="btn btn-p" onClick={send} style={{display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}>
+                <IC n="sn" s={15}/> Enviar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// KANBAN PAGE
+function KanbanPage({data,setData}){
+  const [dragging,setDragging]=useState(null);
+  const [dragOver,setDragOver]=useState(null);
+  const [show,setShow]=useState(false);
+  const [form,setForm]=useState({title:'',contactId:'',column:'Novo Lead',value:'',notes:''});
+
+  const colCards=col=>data.kanban.cards.filter(c=>c.column===col);
+  const getC=id=>data.contacts.find(c=>c.id===id);
+
+  const onDrop=col=>{
+    if(!dragging)return;
+    setData(d=>({...d,kanban:{...d.kanban,cards:d.kanban.cards.map(c=>c.id===dragging?{...c,column:col}:c)}}));
+    setDragging(null);setDragOver(null);
+  };
+
+  const saveCard=()=>{
+    const nid=Math.max(0,...data.kanban.cards.map(c=>c.id))+1;
+    setData(d=>({...d,kanban:{...d.kanban,cards:[...d.kanban.cards,{id:nid,...form,contactId:parseInt(form.contactId)||null,value:parseFloat(form.value)||0}]}}));
+    setShow(false);setForm({title:'',contactId:'',column:'Novo Lead',value:'',notes:''});
+  };
+
+  const delCard=id=>setData(d=>({...d,kanban:{...d.kanban,cards:d.kanban.cards.filter(c=>c.id!==id)}}));
+
+  const pipeline=data.kanban.cards.filter(c=>c.column!=='Perdido').reduce((s,c)=>s+(c.value||0),0);
+
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:600}}>Kanban de Leads</h1>
+          <p style={{color:'var(--text2)',fontSize:13}}>Pipeline: <strong style={{color:'var(--green)'}}>R$ {pipeline.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></p>
+        </div>
+        <button className="btn btn-p" onClick={()=>setShow(true)} style={{display:'flex',alignItems:'center',gap:6}}>
+          <IC n="plus" s={15}/> Novo card
+        </button>
+      </div>
+      <div style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:8}}>
+        {data.kanban.columns.map(col=>(
+          <div key={col}
+            onDragOver={e=>{e.preventDefault();setDragOver(col)}}
+            onDrop={()=>onDrop(col)}
+            onDragLeave={()=>setDragOver(null)}
+            style={{minWidth:210,flex:'0 0 210px',background:dragOver===col?'var(--bg3)':'var(--bg2)',borderRadius:'var(--r)',border:`1px solid ${dragOver===col?'var(--accent)':'var(--border)'}`,transition:'all .15s',padding:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <span style={{fontSize:12,fontWeight:600,color:'var(--text2)'}}>{col}</span>
+              <span style={{fontSize:11,background:'var(--bg4)',color:'var(--text3)',padding:'1px 7px',borderRadius:20}}>{colCards(col).length}</span>
+            </div>
+            {colCards(col).map(card=>{
+              const ct=getC(card.contactId);
+              return(
+                <div key={card.id} draggable
+                  onDragStart={()=>setDragging(card.id)}
+                  onDragEnd={()=>{setDragging(null);setDragOver(null)}}
+                  style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',marginBottom:8,border:'1px solid var(--border)',cursor:'grab',opacity:dragging===card.id?.5:1}}>
+                  <div style={{fontWeight:500,fontSize:13,color:'var(--text)',marginBottom:6}}>{card.title}</div>
+                  {ct&&(
+                    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text2)',marginBottom:6}}>
+                      <Av name={ct.name} size={20}/>{ct.name}
+                    </div>
+                  )}
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    {card.value>0&&<span style={{fontSize:12,color:'var(--green)',fontWeight:600}}>R$ {card.value.toLocaleString('pt-BR')}</span>}
+                    <button onClick={()=>delCard(card.id)} style={{background:'none',color:'var(--text3)',padding:2,marginLeft:'auto'}}><IC n="tr" s={13}/></button>
+                  </div>
+                  {card.notes&&<div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>{card.notes}</div>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {show&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShow(false)}>
+          <div className="modal">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <h2 style={{fontSize:16,fontWeight:600}}>Novo card</h2>
+              <button onClick={()=>setShow(false)} style={{background:'none',color:'var(--text2)',padding:4}}><IC n="x" s={18}/></button>
+            </div>
+            <div className="fg"><label>Título *</label><input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Ex: Pedido ração 25kg"/></div>
+            <div className="fr">
+              <div className="fg"><label>Contato</label>
+                <select value={form.contactId} onChange={e=>setForm(f=>({...f,contactId:e.target.value}))}>
+                  <option value="">Sem contato</option>
+                  {data.contacts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="fg"><label>Coluna</label>
+                <select value={form.column} onChange={e=>setForm(f=>({...f,column:e.target.value}))}>
+                  {data.kanban.columns.map(col=><option key={col} value={col}>{col}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="fg"><label>Valor (R$)</label><input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))} placeholder="0"/></div>
+            <div className="fg"><label>Notas</label><textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2}/></div>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:8}}>
+              <button className="btn btn-g" onClick={()=>setShow(false)}>Cancelar</button>
+              <button className="btn btn-p" onClick={saveCard} disabled={!form.title}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// METRICS PAGE
+function MetricsPage({data}){
+  const total=data.contacts.length;
+  const leads=data.contacts.filter(c=>c.status==='lead').length;
+  const ativos=data.contacts.filter(c=>c.status==='ativo').length;
+  const neg=data.contacts.filter(c=>c.status==='negociando').length;
+  const inat=data.contacts.filter(c=>c.status==='inativo').length;
+  const totalM=data.conversations.length;
+  const botM=data.conversations.filter(m=>m.from==='bot').length;
+  const opM=data.conversations.filter(m=>m.from==='operator').length;
+  const pipeline=data.kanban.cards.filter(c=>c.column!=='Perdido').reduce((s,c)=>s+(c.value||0),0);
+  const fechado=data.kanban.cards.filter(c=>c.column==='Fechado').reduce((s,c)=>s+(c.value||0),0);
+
+  const Stat=({label,val,sub,color})=>(
+    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'16px 20px'}}>
+      <div style={{fontSize:12,color:'var(--text2)',marginBottom:6,fontWeight:500}}>{label}</div>
+      <div style={{fontSize:26,fontWeight:700,color:color||'var(--text)',marginBottom:4}}>{val}</div>
+      {sub&&<div style={{fontSize:12,color:'var(--text3)'}}>{sub}</div>}
+    </div>
+  );
+
+  const Bar=({label,val,max,color})=>{
+    const pct=max?Math.round((val/max)*100):0;
+    return(
+      <div style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+          <span style={{fontSize:13,color:'var(--text2)'}}>{label}</span>
+          <span style={{fontSize:13,fontWeight:500}}>{val}</span>
+        </div>
+        <div style={{height:6,background:'var(--bg4)',borderRadius:3}}>
+          <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:3,transition:'width .5s'}}/>
+        </div>
+      </div>
+    );
+  };
+
+  return(
+    <div>
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:600}}>Métricas</h1>
+        <p style={{color:'var(--text2)',fontSize:13}}>Visão geral do CRM</p>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:20}}>
+        <Stat label="Contatos" val={total} sub={`${leads} leads`}/>
+        <Stat label="Mensagens" val={totalM} sub={`${botM} do Tião`} color="var(--accent2)"/>
+        <Stat label="Pipeline" val={`R$ ${pipeline.toLocaleString('pt-BR')}`} sub={`${data.kanban.cards.length} cards`} color="var(--amber)"/>
+        <Stat label="Fechado" val={`R$ ${fechado.toLocaleString('pt-BR')}`} sub={`${data.kanban.cards.filter(c=>c.column==='Fechado').length} negócios`} color="var(--green)"/>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:16}}>Contatos por status</h3>
+          <Bar label="Ativos" val={ativos} max={total} color="var(--green)"/>
+          <Bar label="Leads" val={leads} max={total} color="var(--accent)"/>
+          <Bar label="Negociando" val={neg} max={total} color="var(--amber)"/>
+          <Bar label="Inativos" val={inat} max={total} color="var(--text3)"/>
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:16}}>Kanban por coluna</h3>
+          {data.kanban.columns.map(col=>{
+            const n=data.kanban.cards.filter(c=>c.column===col).length;
+            const color=col==='Fechado'?'var(--green)':col==='Perdido'?'var(--red)':'var(--accent)';
+            return <Bar key={col} label={col} val={n} max={data.kanban.cards.length} color={color}/>;
+          })}
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:16}}>Mensagens por origem</h3>
+          <Bar label="Bot (Tião)" val={botM} max={totalM} color="var(--purple)"/>
+          <Bar label="Operador" val={opM} max={totalM} color="var(--accent)"/>
+          <Bar label="Cliente" val={totalM-botM-opM} max={totalM} color="var(--teal)"/>
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:16}}>Agente n8n</h3>
+          {[
+            ['Status',<span className={`tag ${data.agent.status==='active'?'tg':'tr'}`}>{data.agent.status==='active'?'● Ativo':'● Pausado'}</span>],
+            ['Mensagens respondidas',data.agent.totalMessages.toLocaleString('pt-BR')],
+            ['Handoffs para humano',data.agent.handoffs],
+            ['Taxa de resposta',`${data.agent.responseRate}%`],
+          ].map(([l,v],i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+              <span style={{color:'var(--text2)',fontSize:13}}>{l}</span>
+              <span style={{fontWeight:600}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// AGENT PAGE
+function AgentPage({data,setData}){
+  const [prompt,setPrompt]=useState('Você é Tião, assistente de vendas da Pecuarão Gontijo em Divinópolis/MG.\n\nResponda perguntas sobre:\n- Produtos disponíveis e preços\n- Pedidos e entregas\n- Horários e localização\n\nSempre seja simpático e use linguagem informal. Para dúvidas complexas, passe para o atendente humano dizendo: "Vou chamar um atendente para te ajudar!"');
+  const [status,setStatus]=useState(data.agent.status);
+  const [loading,setLoading]=useState(false);
+  const [saved,setSaved]=useState(false);
+  const cfg=data.config;
+
+  const toggle=async()=>{
+    if(!cfg.n8nUrl||!cfg.n8nApiKey||!cfg.workflowId){
+      alert('Configure a URL do n8n, API Key e Workflow ID na aba Configurações.');return;
+    }
+    setLoading(true);
+    try{
+      const action=status==='active'?'deactivate':'activate';
+      const res=await fetch(`${cfg.n8nUrl}/api/v1/workflows/${cfg.workflowId}/${action}`,{
+        method:'POST',headers:{'X-N8N-API-KEY':cfg.n8nApiKey,'Content-Type':'application/json'}
+      });
+      if(res.ok){
+        const ns=status==='active'?'paused':'active';
+        setStatus(ns);setData(d=>({...d,agent:{...d.agent,status:ns}}));
+      }else{alert('Erro ao chamar API do n8n. Verifique as configurações.');}
+    }catch(e){alert('Não foi possível conectar ao n8n: '+e.message);}
+    setLoading(false);
+  };
+
+  const savePr=()=>{setSaved(true);setTimeout(()=>setSaved(false),2000)};
+
+  return(
+    <div>
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:600}}>Painel do Agente</h1>
+        <p style={{color:'var(--text2)',fontSize:13}}>Controle o Tião — seu agente WhatsApp no n8n</p>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+        <div className="card">
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+            <div style={{width:44,height:44,borderRadius:'50%',background:status==='active'?'rgba(34,197,94,.15)':'rgba(239,68,68,.15)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <IC n="bot" s={22} st={{color:status==='active'?'var(--green)':'var(--red)'}}/>
+            </div>
+            <div>
+              <div style={{fontWeight:600}}>Tião</div>
+              <span className={`tag ${status==='active'?'tg':'tr'}`}>{status==='active'?'● Online':'● Pausado'}</span>
+            </div>
+          </div>
+          <p style={{fontSize:13,color:'var(--text2)',marginBottom:16,lineHeight:1.6}}>
+            {status==='active'?'Agente ativo e respondendo mensagens automaticamente.':'Agente pausado. Mensagens não são respondidas automaticamente.'}
+          </p>
+          <button onClick={toggle} disabled={loading} className={`btn ${status==='active'?'btn-d':'btn-p'}`} style={{display:'flex',alignItems:'center',gap:8,opacity:loading?.7:1}}>
+            {loading?<IC n="rf" s={15}/>:<IC n={status==='active'?'pa':'pl'} s={15}/>}
+            {loading?'Aguarde...':status==='active'?'Pausar agente':'Ativar agente'}
+          </button>
+          {(!cfg.n8nUrl||!cfg.n8nApiKey||!cfg.workflowId)&&(
+            <p style={{fontSize:11,color:'var(--amber)',marginTop:10}}>⚠ Configure o n8n em Configurações para controle real.</p>
+          )}
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:14}}>Métricas do Tião</h3>
+          {[['Mensagens respondidas',data.agent.totalMessages.toLocaleString('pt-BR'),'var(--accent2)'],
+            ['Handoffs para humano',data.agent.handoffs,'var(--amber)'],
+            ['Taxa de resposta',`${data.agent.responseRate}%`,'var(--green)']
+          ].map(([l,v,c])=>(
+            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+              <span style={{color:'var(--text2)',fontSize:13}}>{l}</span>
+              <span style={{fontWeight:600,color:c}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h3 style={{fontSize:14,fontWeight:600}}>Prompt do Tião</h3>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            {saved&&<span style={{fontSize:12,color:'var(--green)',display:'flex',alignItems:'center',gap:4}}><IC n="ok" s={13}/> Copiado!</span>}
+            <button className="btn btn-p" onClick={savePr}>Copiar prompt</button>
+          </div>
+        </div>
+        <p style={{fontSize:12,color:'var(--text3)',marginBottom:10}}>
+          Edite e copie este prompt para colar no nó do seu workflow n8n.
+        </p>
+        <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={12}
+          style={{fontFamily:'monospace',fontSize:12,lineHeight:1.6,resize:'vertical'}}/>
+      </div>
+      <div className="card" style={{marginTop:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div>
+            <h3 style={{fontSize:14,fontWeight:600}}>Aprendizados do Tião</h3>
+            <p style={{fontSize:12,color:'var(--text3)',marginTop:2}}>Correções feitas nas conversas — aplique no prompt</p>
+          </div>
+          {(data.learnings||[]).length>0&&(
+            <button className="btn btn-g" style={{fontSize:12}} onClick={()=>{
+              const txt=(data.learnings||[]).map((l,i)=>`[${i+1}] ERRADO: "${l.original}"
+CERTO: "${l.corrected}"`).join('
+
+');
+              navigator.clipboard.writeText('CORREÇÕES E APRENDIZADOS:
+
+'+txt);
+            }}>Copiar todos</button>
+          )}
+        </div>
+        {(data.learnings||[]).length===0?(
+          <div style={{textAlign:'center',padding:'24px 0',color:'var(--text3)',fontSize:13}}>
+            Nenhum aprendizado ainda. Corrija respostas do Tião nas Conversas.
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {[...(data.learnings||[])].reverse().map((l,i)=>(
+              <div key={l.id} style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--border)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:11,color:'var(--text3)'}}>{fmtD(l.ts)}</span>
+                  <button onClick={()=>setData(d=>({...d,learnings:(d.learnings||[]).filter(x=>x.id!==l.id)}))}
+                    style={{background:'none',color:'var(--text3)',padding:2}}><IC n="tr" s={13}/></button>
+                </div>
+                <div style={{marginBottom:6}}>
+                  <div style={{fontSize:11,color:'var(--red)',marginBottom:2}}>✗ Errado</div>
+                  <div style={{fontSize:12,color:'var(--text2)',background:'rgba(239,68,68,.06)',padding:'6px 8px',borderRadius:6,lineHeight:1.5}}>{l.original}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:'var(--green)',marginBottom:2}}>✓ Correto</div>
+                  <div style={{fontSize:12,color:'var(--text)',background:'rgba(34,197,94,.06)',padding:'6px 8px',borderRadius:6,lineHeight:1.5}}>{l.corrected}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// SETTINGS PAGE
+function SettingsPage({data,setData}){
+  const [form,setForm]=useState({...data.config});
+  const [saved,setSaved]=useState(false);
+
+  const save=()=>{setData(d=>({...d,config:{...form}}));setSaved(true);setTimeout(()=>setSaved(false),2000)};
+  const F=({k,label,ph,type='text'})=>(
+    <div className="fg">
+      <label>{label}</label>
+      <input type={type} value={form[k]||''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} placeholder={ph}/>
+    </div>
+  );
+
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:600}}>Configurações</h1>
+          <p style={{color:'var(--text2)',fontSize:13}}>Integrações e conexões</p>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {saved&&<span style={{fontSize:12,color:'var(--green)',display:'flex',alignItems:'center',gap:4}}><IC n="ok" s={13}/> Salvo!</span>}
+          <button className="btn btn-p" onClick={save}>Salvar</button>
+        </div>
+      </div>
+      <div style={{display:'grid',gap:16}}>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:4}}>n8n</h3>
+          <p style={{fontSize:12,color:'var(--text3)',marginBottom:16}}>Para controlar o workflow do Tião (ativar/pausar)</p>
+          <div className="fr">
+            <F k="n8nUrl" label="URL do n8n" ph="https://sua-instancia.n8n.cloud"/>
+            <F k="n8nApiKey" label="API Key" ph="eyJhbGci..." type="password"/>
+          </div>
+          <F k="workflowId" label="ID do Workflow do Tião" ph="Ex: 42"/>
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:4}}>Evolution API</h3>
+          <p style={{fontSize:12,color:'var(--text3)',marginBottom:16}}>Para enviar mensagens diretamente do CRM</p>
+          <div className="fr">
+            <F k="evolutionUrl" label="URL da Evolution API" ph="https://api.evolution.com"/>
+            <F k="evolutionKey" label="API Key" ph="sua-chave-aqui" type="password"/>
+          </div>
+          <F k="instance" label="Nome da instância" ph="Ex: pecuarao"/>
+        </div>
+        <div className="card">
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:4}}>Banco de dados</h3>
+          <p style={{fontSize:12,color:'var(--text3)',marginBottom:16}}>URL da API REST (PostgREST ou endpoint próprio do PostgreSQL via DbGate)</p>
+          <F k="apiUrl" label="API URL" ph="http://localhost:3000"/>
+          <div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,padding:12,marginTop:4}}>
+            <p style={{fontSize:12,color:'var(--amber)',lineHeight:1.6}}>
+              💡 Os dados ficam salvos localmente no navegador. Para sincronizar com PostgreSQL, configure um endpoint REST (PostgREST) apontando para seu banco via DbGate.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// APP ROOT
+function App(){
+  const [data,setDataRaw]=useState(loadD);
+  const [page,setPage]=useState('contacts');
+  const [activeContact,setActiveContact]=useState(null);
+
+  const setData=useCallback(upd=>{
+    setDataRaw(prev=>{
+      const next=typeof upd==='function'?upd(prev):upd;
+      saveD(next);return next;
+    });
+  },[]);
+
+  const pages={
+    contacts:<ContactsPage data={data} setData={setData} setActiveContact={setActiveContact} setPage={setPage}/>,
+    inbox:<InboxPage data={data} setData={setData} activeContact={activeContact} setActiveContact={setActiveContact}/>,
+    kanban:<KanbanPage data={data} setData={setData}/>,
+    metrics:<MetricsPage data={data}/>,
+    agent:<AgentPage data={data} setData={setData}/>,
+    settings:<SettingsPage data={data} setData={setData}/>,
+  };
+
+  return(
+    <div style={{display:'flex',minHeight:'100vh'}}>
+      <Sidebar active={page} setActive={p=>setPage(p)}/>
+      <main style={{flex:1,marginLeft:220,padding:'24px 28px',minHeight:'100vh',maxWidth:'calc(100vw - 220px)'}}>
+        {pages[page]}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
